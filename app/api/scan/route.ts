@@ -69,24 +69,41 @@ export async function POST(req: NextRequest) {
       throw new Error("No profile or companies configured");
     }
 
+    // Exemplars: proven ideal-fit jobs used to tune scoring (few-shot)
+    const { data: exemplars } = await serviceSupabase
+      .from("exemplars")
+      .select("*")
+      .eq("user_id", userId);
+
     const profileSummary = `
 Name: ${profile.name}
 Location: ${profile.location}
 Positioning: ${profile.positioning_statement}
 Skills: ${Array.isArray(profile.skills) ? (profile.skills as string[]).join(", ") : ""}
-Deal-breakers: ${profile.deal_breakers?.join(", ") ?? "none"}
+Green flags (things she WANTS): ${profile.green_flags?.join("; ") || "none specified"}
+Deal-breakers (avoid): ${profile.deal_breakers?.join("; ") ?? "none"}
 `.trim();
+
+    const exemplarBlock =
+      exemplars && exemplars.length > 0
+        ? `\n\nIDEAL-FIT EXAMPLES (these are roles the candidate confirmed are excellent fits — use them as the gold standard for what a great match looks like):\n${exemplars
+            .map(
+              (e) =>
+                `- ${e.title} @ ${e.company ?? "?"} (${e.location ?? "?"}): ${e.description ?? ""}${e.why_great ? ` — Why it's great: ${e.why_great}` : ""}`
+            )
+            .join("\n")}`
+        : "";
 
     // Search for jobs at each company using Claude + web_search
     const searchPrompt = `You are a job search assistant. Search for currently open job listings at these companies for a candidate with this profile:
 
 CANDIDATE PROFILE:
-${profileSummary}
+${profileSummary}${exemplarBlock}
 
 TARGET COMPANIES (search each for open roles):
 ${companies.map((c) => `- ${c.name}${c.careers_url ? ` (${c.careers_url})` : ""}`).join("\n")}
 
-For each company, use web_search to find current open job listings. Look on their careers page and job boards.
+For each company, use web_search to find current open job listings. Look on their careers page and job boards. Prioritize roles that resemble the IDEAL-FIT EXAMPLES above.
 
 Return results as a JSON array of objects with these fields:
 - title: string
@@ -173,10 +190,10 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
     let jobsAboveThreshold = 0;
 
     for (const job of insertedJobs ?? []) {
-      const scorePrompt = `Score this job listing for this candidate on a scale of 1-10.
+      const scorePrompt = `Score this job listing for this candidate on a scale of 1-10. A 10 means it is as good a fit as the IDEAL-FIT EXAMPLES. Reward roles that match the green flags and resemble the ideal examples; penalize anything hitting a deal-breaker.
 
 CANDIDATE PROFILE:
-${profileSummary}
+${profileSummary}${exemplarBlock}
 
 JOB:
 Title: ${job.title}

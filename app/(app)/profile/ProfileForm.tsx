@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Tables } from "@/lib/supabase/database.types";
+import TagInput from "@/components/ui/TagInput";
 
 type Profile = Tables<"profiles">;
 
@@ -11,40 +12,44 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  const [form, setForm] = useState({
-    name: profile?.name ?? "",
-    location: profile?.location ?? "",
-    positioning_statement: profile?.positioning_statement ?? "",
-    skills: Array.isArray(profile?.skills)
-      ? (profile.skills as string[]).join(", ")
-      : "",
-    deal_breakers: profile?.deal_breakers?.join(", ") ?? "",
-  });
+  const [name, setName] = useState(profile?.name ?? "");
+  const [location, setLocation] = useState(profile?.location ?? "");
+  const [positioning, setPositioning] = useState(
+    profile?.positioning_statement ?? ""
+  );
+  const [skills, setSkills] = useState(
+    Array.isArray(profile?.skills) ? (profile.skills as string[]).join(", ") : ""
+  );
+  const [dealBreakers, setDealBreakers] = useState<string[]>(
+    profile?.deal_breakers ?? []
+  );
+  const [greenFlags, setGreenFlags] = useState<string[]>(
+    profile?.green_flags ?? []
+  );
 
-  function set(field: keyof typeof form, value: string) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+  function dirty() {
     setSaved(false);
   }
 
   async function save() {
     setSaving(true);
-    const skills = form.skills
-      .split(",")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    const deal_breakers = form.deal_breakers
+    const skillsArr = skills
       .split(",")
       .map((s) => s.trim())
       .filter(Boolean);
 
-    await supabase.from("profiles").update({
-      name: form.name,
-      location: form.location,
-      positioning_statement: form.positioning_statement,
-      skills,
-      deal_breakers,
-      updated_at: new Date().toISOString(),
-    });
+    await supabase
+      .from("profiles")
+      .update({
+        name,
+        location,
+        positioning_statement: positioning,
+        skills: skillsArr,
+        deal_breakers: dealBreakers,
+        green_flags: greenFlags,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("user_id", profile!.user_id);
 
     setSaving(false);
     setSaved(true);
@@ -54,17 +59,20 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
     "w-full bg-[#0A0F1E] border border-[#1a2340] rounded-lg px-4 py-2.5 text-white placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-[#1B5E20] text-sm";
 
   return (
-    <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-6 space-y-6">
-      <div className="grid grid-cols-2 gap-4">
+    <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-5 sm:p-6 space-y-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-medium text-slate-400 mb-1.5">
-            Full name
+            Candidate name
           </label>
           <input
             className={field}
-            value={form.name}
-            onChange={(e) => set("name", e.target.value)}
-            placeholder="Diana Prince"
+            value={name}
+            onChange={(e) => {
+              setName(e.target.value);
+              dirty();
+            }}
+            placeholder="Stella Bennett"
           />
         </div>
         <div>
@@ -73,8 +81,11 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
           </label>
           <input
             className={field}
-            value={form.location}
-            onChange={(e) => set("location", e.target.value)}
+            value={location}
+            onChange={(e) => {
+              setLocation(e.target.value);
+              dirty();
+            }}
             placeholder="New York, NY"
           />
         </div>
@@ -86,35 +97,57 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
         </label>
         <textarea
           className={`${field} resize-none h-28`}
-          value={form.positioning_statement}
-          onChange={(e) => set("positioning_statement", e.target.value)}
-          placeholder="2-sentence summary of who you are and what you bring..."
+          value={positioning}
+          onChange={(e) => {
+            setPositioning(e.target.value);
+            dirty();
+          }}
+          placeholder="2-3 sentence summary of who you are and what you bring..."
         />
       </div>
 
       <div>
         <label className="block text-xs font-medium text-slate-400 mb-1.5">
-          Skills{" "}
-          <span className="text-slate-600">(comma-separated)</span>
+          Skills <span className="text-slate-600">(comma-separated)</span>
         </label>
         <textarea
           className={`${field} resize-none h-20`}
-          value={form.skills}
-          onChange={(e) => set("skills", e.target.value)}
-          placeholder="Python, SQL, dbt, Looker, Tableau, stakeholder management..."
+          value={skills}
+          onChange={(e) => {
+            setSkills(e.target.value);
+            dirty();
+          }}
+          placeholder="Video production, Runway AI, social media, copywriting..."
         />
       </div>
 
       <div>
-        <label className="block text-xs font-medium text-slate-400 mb-1.5">
-          Deal-breakers{" "}
-          <span className="text-slate-600">(comma-separated)</span>
+        <label className="block text-xs font-medium text-green-400 mb-2">
+          Green flags <span className="text-slate-500 font-normal">— things she wants</span>
         </label>
-        <input
-          className={field}
-          value={form.deal_breakers}
-          onChange={(e) => set("deal_breakers", e.target.value)}
-          placeholder="Requires relocation, no remote, requires security clearance..."
+        <TagInput
+          items={greenFlags}
+          onChange={(v) => {
+            setGreenFlags(v);
+            dirty();
+          }}
+          placeholder="e.g. Intentional, people-first culture"
+          accent="green"
+        />
+      </div>
+
+      <div>
+        <label className="block text-xs font-medium text-red-400 mb-2">
+          Deal-breakers <span className="text-slate-500 font-normal">— things to avoid</span>
+        </label>
+        <TagInput
+          items={dealBreakers}
+          onChange={(v) => {
+            setDealBreakers(v);
+            dirty();
+          }}
+          placeholder="e.g. Requires 5+ years experience"
+          accent="red"
         />
       </div>
 
@@ -126,9 +159,7 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
         >
           {saving ? "Saving…" : "Save profile"}
         </button>
-        {saved && (
-          <span className="text-sm text-green-400">Saved ✓</span>
-        )}
+        {saved && <span className="text-sm text-green-400">Saved ✓</span>}
       </div>
     </div>
   );

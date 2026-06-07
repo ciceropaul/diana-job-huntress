@@ -10,7 +10,7 @@ export default async function TrackerPage() {
     .order("status_updated_at", { ascending: false });
 
   return (
-    <div className="p-8">
+    <div className="p-5 sm:p-8">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Application Tracker</h1>
         <p className="text-slate-400 mt-1">Drag cards between columns to update status.</p>

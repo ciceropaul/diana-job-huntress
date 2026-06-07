@@ -12,7 +12,7 @@ export default async function JobsPage() {
     .order("date_found", { ascending: false });
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
+    <div className="p-5 sm:p-8 max-w-5xl mx-auto">
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Job Listings</h1>

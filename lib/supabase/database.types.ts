@@ -85,6 +85,42 @@ export type Database = {
           },
         ]
       }
+      exemplars: {
+        Row: {
+          company: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          location: string | null
+          source_url: string | null
+          title: string
+          user_id: string
+          why_great: string | null
+        }
+        Insert: {
+          company?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          source_url?: string | null
+          title: string
+          user_id: string
+          why_great?: string | null
+        }
+        Update: {
+          company?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          location?: string | null
+          source_url?: string | null
+          title?: string
+          user_id?: string
+          why_great?: string | null
+        }
+        Relationships: []
+      }
       job_listings: {
         Row: {
           company: string
@@ -172,6 +208,7 @@ export type Database = {
         Row: {
           deal_breakers: string[] | null
           experience: Json | null
+          green_flags: string[]
           id: string
           location: string | null
           name: string | null
@@ -185,6 +222,7 @@ export type Database = {
         Insert: {
           deal_breakers?: string[] | null
           experience?: Json | null
+          green_flags?: string[]
           id?: string
           location?: string | null
           name?: string | null
@@ -198,6 +236,7 @@ export type Database = {
         Update: {
           deal_breakers?: string[] | null
           experience?: Json | null
+          green_flags?: string[]
           id?: string
           location?: string | null
           name?: string | null

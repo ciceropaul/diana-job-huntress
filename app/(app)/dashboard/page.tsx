@@ -1,17 +1,20 @@
 import { createClient } from "@/lib/supabase/server";
 import { Briefcase, Building2, TrendingUp, Clock } from "lucide-react";
+import DashboardHeader from "./DashboardHeader";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const [
-    { data: profile },
     { count: jobCount },
     { count: companyCount },
     { data: recentJobs },
     { data: recentScans },
   ] = await Promise.all([
-    supabase.from("profiles").select("name").single(),
     supabase.from("job_listings").select("*", { count: "exact", head: true }),
     supabase
       .from("target_companies")
@@ -29,7 +32,11 @@ export default async function DashboardPage() {
       .limit(3),
   ]);
 
-  const firstName = profile?.name?.split(" ")[0] ?? "Diana";
+  // Greet the operator (logged-in user) by their Google name — not the candidate profile
+  const meta = user?.user_metadata ?? {};
+  const fullName: string =
+    meta.full_name || meta.name || user?.email?.split("@")[0] || "there";
+  const firstName = fullName.split(" ")[0];
 
   const stats = [
     {
@@ -56,19 +63,11 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">
-          Good morning, {firstName} 👋
-        </h1>
-        <p className="text-slate-400 mt-1">
-          Here&apos;s your job search snapshot.
-        </p>
-      </div>
+    <div className="p-5 sm:p-8 max-w-5xl mx-auto">
+      <DashboardHeader name={firstName} />
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
         {stats.map(({ label, value, icon: Icon, color, bg }) => (
           <div
             key={label}

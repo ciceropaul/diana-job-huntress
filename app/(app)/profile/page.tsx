@@ -9,7 +9,7 @@ export default async function ProfilePage() {
     .single();
 
   return (
-    <div className="p-8 max-w-3xl mx-auto">
+    <div className="p-5 sm:p-8 max-w-3xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Profile</h1>
         <p className="text-slate-400 mt-1">

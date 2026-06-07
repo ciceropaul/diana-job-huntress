@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import CoverLetterSection from "./CoverLetterSection";
+import FlagGreatFit from "./FlagGreatFit";
 import { cn } from "@/lib/utils";
 
 export default async function JobDetailPage({
@@ -12,6 +13,10 @@ export default async function JobDetailPage({
   const { id } = await params;
   const supabase = await createClient();
 
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   const { data: job } = await supabase
     .from("job_listings")
     .select("*, job_scores(*), cover_letters(*), applications(*)")
@@ -19,6 +24,12 @@ export default async function JobDetailPage({
     .single();
 
   if (!job) notFound();
+
+  const { data: exemplarMatch } = await supabase
+    .from("exemplars")
+    .select("id")
+    .eq("source_url", job.source_url)
+    .maybeSingle();
 
   const score = Array.isArray(job.job_scores) && job.job_scores.length > 0
     ? (job.job_scores[0] as { overall: number; reasoning: string; matched_skills: string[]; gaps: string[] })
@@ -29,10 +40,10 @@ export default async function JobDetailPage({
     : null;
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
+    <div className="p-5 sm:p-8 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">{job.title}</h1>
             <p className="text-slate-400 mt-1">
@@ -40,7 +51,7 @@ export default async function JobDetailPage({
               {job.location && <span className="text-slate-600"> · {job.location}</span>}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 flex-wrap">
             {score && (
               <span
                 className={cn(
@@ -55,6 +66,17 @@ export default async function JobDetailPage({
                 {score.overall}/10
               </span>
             )}
+            <FlagGreatFit
+              userId={user!.id}
+              job={{
+                title: job.title,
+                company: job.company,
+                location: job.location,
+                source_url: job.source_url,
+                description: job.description,
+              }}
+              alreadyFlagged={!!exemplarMatch}
+            />
             <a
               href={job.source_url}
               target="_blank"
@@ -67,9 +89,9 @@ export default async function JobDetailPage({
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: description + score */}
-        <div className="col-span-2 space-y-6">
+        <div className="lg:col-span-2 space-y-6">
           {/* Score breakdown */}
           {score && (
             <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-5">
@@ -116,7 +138,7 @@ export default async function JobDetailPage({
         </div>
 
         {/* Right: cover letter */}
-        <div className="col-span-1">
+        <div className="lg:col-span-1">
           <CoverLetterSection jobId={job.id} initialCoverLetter={coverLetter} />
         </div>
       </div>
