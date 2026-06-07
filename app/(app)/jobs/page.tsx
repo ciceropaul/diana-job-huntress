@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
-import { Briefcase, ExternalLink } from "lucide-react";
+import { Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export default async function JobsPage() {
@@ -45,20 +45,9 @@ export default async function JobsPage() {
               >
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-white group-hover:text-[#4CAF50] transition-colors">
-                        {job.title}
-                      </h3>
-                      <a
-                        href={job.source_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-slate-600 hover:text-slate-400"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                      </a>
-                    </div>
+                    <h3 className="font-semibold text-white group-hover:text-[#4CAF50] transition-colors mb-1">
+                      {job.title}
+                    </h3>
                     <p className="text-sm text-slate-400">
                       {job.company}
                       {job.location && (

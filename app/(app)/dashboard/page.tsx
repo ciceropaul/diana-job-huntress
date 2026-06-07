@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import Link from "next/link";
 import { Briefcase, Building2, TrendingUp, Clock } from "lucide-react";
 import DashboardHeader from "./DashboardHeader";
 
@@ -84,9 +85,17 @@ export default async function DashboardPage() {
 
       {/* Recent jobs */}
       <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-6 mb-6">
-        <h2 className="text-lg font-semibold text-white mb-4">
-          Recent Job Finds
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-white">Recent Job Finds</h2>
+          {jobCount && jobCount > 0 ? (
+            <Link
+              href="/jobs"
+              className="text-sm font-medium text-[#4CAF50] hover:text-[#66BB6A] transition-colors"
+            >
+              View all {jobCount} →
+            </Link>
+          ) : null}
+        </div>
         {!recentJobs || recentJobs.length === 0 ? (
           <div className="text-center py-10 text-slate-500">
             <Briefcase className="w-10 h-10 mx-auto mb-3 opacity-30" />
@@ -100,12 +109,15 @@ export default async function DashboardPage() {
                   ? (job.job_scores[0] as { overall: number }).overall
                   : null;
               return (
-                <div
+                <Link
                   key={job.id}
-                  className="flex items-center justify-between py-3 border-b border-[#1a2340] last:border-0"
+                  href={`/jobs/${job.id}`}
+                  className="flex items-center justify-between py-3 border-b border-[#1a2340] last:border-0 -mx-2 px-2 rounded-lg hover:bg-white/[0.02] transition-colors group"
                 >
                   <div>
-                    <p className="text-sm font-medium text-white">{job.title}</p>
+                    <p className="text-sm font-medium text-white group-hover:text-[#4CAF50] transition-colors">
+                      {job.title}
+                    </p>
                     <p className="text-xs text-slate-400">{job.company}</p>
                   </div>
                   {score !== null && (
@@ -121,7 +133,7 @@ export default async function DashboardPage() {
                       {score}/10
                     </span>
                   )}
-                </div>
+                </Link>
               );
             })}
           </div>
