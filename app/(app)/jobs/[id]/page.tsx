@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ExternalLink } from "lucide-react";
 import CoverLetterSection from "./CoverLetterSection";
 import FlagGreatFit from "./FlagGreatFit";
+import ReanalyzeButton from "./ReanalyzeButton";
 import { cn } from "@/lib/utils";
 
 export default async function JobDetailPage({
@@ -32,7 +33,7 @@ export default async function JobDetailPage({
     .maybeSingle();
 
   const score = Array.isArray(job.job_scores) && job.job_scores.length > 0
-    ? (job.job_scores[0] as { overall: number; reasoning: string; matched_skills: string[]; gaps: string[] })
+    ? (job.job_scores[0] as { overall: number; reasoning: string; fit_summary: string | null; matched_skills: string[]; gaps: string[] })
     : null;
 
   const coverLetter = Array.isArray(job.cover_letters) && job.cover_letters.length > 0
@@ -92,10 +93,21 @@ export default async function JobDetailPage({
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: description + score */}
         <div className="lg:col-span-2 space-y-6">
+          {/* Why this fits you (second-person summary) */}
+          {score?.fit_summary && (
+            <div className="bg-[#1B5E20]/10 border border-[#1B5E20]/30 rounded-xl p-5">
+              <h2 className="text-sm font-semibold text-[#4CAF50] mb-2">Why this fits you</h2>
+              <p className="text-sm text-slate-200 leading-relaxed">{score.fit_summary}</p>
+            </div>
+          )}
+
           {/* Score breakdown */}
           {score && (
             <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-5">
-              <h2 className="text-sm font-semibold text-white mb-3">AI Scoring</h2>
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-white">AI Scoring</h2>
+                <ReanalyzeButton jobId={job.id} />
+              </div>
               {score.reasoning && (
                 <p className="text-sm text-slate-400 mb-4">{score.reasoning}</p>
               )}

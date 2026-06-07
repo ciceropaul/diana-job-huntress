@@ -3,6 +3,8 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse, after } from "next/server";
 import type { Database } from "@/lib/supabase/database.types";
+import { buildCandidateContext, scoreJob, textOf } from "@/lib/scoring";
+import { sendDigest } from "@/lib/email/digest";
 
 export const maxDuration = 300;
 
@@ -20,13 +22,6 @@ function serviceClient(): ServiceClient {
 function isCronRequest(req: NextRequest) {
   const auth = req.headers.get("authorization");
   return auth === `Bearer ${process.env.CRON_SECRET}`;
-}
-
-function textOf(content: Anthropic.Messages.ContentBlock[]): string {
-  return content
-    .filter((b) => b.type === "text")
-    .map((b) => (b as { type: "text"; text: string }).text)
-    .join("");
 }
 
 // GET /api/scan?id=<scanLogId> — poll status of a scan
@@ -125,24 +120,8 @@ async function runScan(
     throw new Error("No profile or companies configured");
   }
 
-  const profileSummary = `
-Name: ${profile.name}
-Location: ${profile.location}
-Positioning: ${profile.positioning_statement}
-Skills: ${Array.isArray(profile.skills) ? (profile.skills as string[]).join(", ") : ""}
-Green flags (things she WANTS): ${profile.green_flags?.join("; ") || "none specified"}
-Deal-breakers (avoid): ${profile.deal_breakers?.join("; ") ?? "none"}
-`.trim();
-
-  const exemplarBlock =
-    exemplars && exemplars.length > 0
-      ? `\n\nIDEAL-FIT EXAMPLES (these are roles the candidate confirmed are excellent fits — use them as the gold standard for what a great match looks like):\n${exemplars
-          .map(
-            (e) =>
-              `- ${e.title} @ ${e.company ?? "?"} (${e.location ?? "?"}): ${e.description ?? ""}${e.why_great ? ` — Why it's great: ${e.why_great}` : ""}`
-          )
-          .join("\n")}`
-      : "";
+  const ctx = buildCandidateContext(profile, exemplars);
+  const { profileSummary, exemplarBlock } = ctx;
 
   const searchPrompt = `You are a job search assistant. Search for currently open job listings at these companies for a candidate with this profile:
 
@@ -195,7 +174,15 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
     .eq("user_id", userId);
 
   const existingUrls = new Set(existingListings?.map((l) => l.source_url) ?? []);
-  const newJobs = jobsRaw.filter((j) => j.source_url && !existingUrls.has(j.source_url));
+  // Dedup against the DB and within the batch itself (the model sometimes repeats)
+  const seen = new Set<string>();
+  const newJobs = jobsRaw.filter((j) => {
+    if (!j.source_url || existingUrls.has(j.source_url) || seen.has(j.source_url)) {
+      return false;
+    }
+    seen.add(j.source_url);
+    return true;
+  });
 
   if (newJobs.length === 0) {
     await serviceSupabase
@@ -234,47 +221,22 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
 
   const minScore = userSettings?.digest_min_score ?? 7;
 
-  // Score jobs in parallel
+  // Score jobs in parallel using the shared scoring helper
   const scoreResults = await Promise.all(
     (insertedJobs ?? []).map(async (job) => {
-      const scorePrompt = `Score this job listing for this candidate on a scale of 1-10. A 10 means it is as good a fit as the IDEAL-FIT EXAMPLES. Reward roles that match the green flags and resemble the ideal examples; penalize anything hitting a deal-breaker.
-
-CANDIDATE PROFILE:
-${profileSummary}${exemplarBlock}
-
-JOB:
-Title: ${job.title}
-Company: ${job.company}
-Location: ${job.location ?? "Not specified"}
-Description: ${job.description ?? "Not provided"}
-
-Respond ONLY with valid JSON in this format:
-{
-  "overall": <number 1-10>,
-  "dimensions": { "skills_match": <1-10>, "seniority_fit": <1-10>, "location_ok": <1-10> },
-  "reasoning": "<2-3 sentences>",
-  "matched_skills": ["<skill1>", "<skill2>"],
-  "gaps": ["<gap1>", "<gap2>"]
-}`;
-
       try {
-        const scoreResponse = await anthropic.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 512,
-          messages: [{ role: "user", content: scorePrompt }],
-        });
-        const jsonMatch = textOf(scoreResponse.content).match(/\{[\s\S]*\}/);
-        if (!jsonMatch) return null;
-        const score = JSON.parse(jsonMatch[0]);
+        const score = await scoreJob(anthropic, job, ctx);
+        if (!score) return null;
         await serviceSupabase.from("job_scores").insert({
           job_listing_id: job.id,
           overall: score.overall,
-          dimensions: score.dimensions ?? null,
-          reasoning: score.reasoning ?? null,
-          matched_skills: score.matched_skills ?? [],
-          gaps: score.gaps ?? [],
+          dimensions: score.dimensions,
+          reasoning: score.reasoning,
+          fit_summary: score.fit_summary,
+          matched_skills: score.matched_skills,
+          gaps: score.gaps,
         });
-        return score.overall as number;
+        return { job, overall: score.overall, fit_summary: score.fit_summary };
       } catch (err) {
         console.error("Scoring error for job", job.id, err);
         return null;
@@ -282,9 +244,31 @@ Respond ONLY with valid JSON in this format:
     })
   );
 
-  const scores = scoreResults.filter((s): s is number => s !== null);
-  const jobsScored = scores.length;
-  const jobsAboveThreshold = scores.filter((s) => s >= minScore).length;
+  type ScoredEntry = NonNullable<(typeof scoreResults)[number]>;
+  const scored = scoreResults.filter((s): s is ScoredEntry => s !== null);
+  const jobsScored = scored.length;
+  const strongMatches = scored.filter((s) => s.overall >= minScore);
+  const jobsAboveThreshold = strongMatches.length;
+
+  // Send the email digest (best-effort; never fail the scan because of email)
+  let emailSent = false;
+  try {
+    emailSent = await sendDigest({
+      userId,
+      candidateName: ctx.firstName,
+      matches: strongMatches.map((s) => ({
+        id: s.job.id,
+        title: s.job.title,
+        company: s.job.company,
+        location: s.job.location,
+        source_url: s.job.source_url,
+        overall: s.overall,
+        fit_summary: s.fit_summary,
+      })),
+    });
+  } catch (err) {
+    console.error("Digest send failed:", err);
+  }
 
   await serviceSupabase
     .from("scan_logs")
@@ -293,6 +277,7 @@ Respond ONLY with valid JSON in this format:
       jobs_found: newJobs.length,
       jobs_scored: jobsScored,
       jobs_above_threshold: jobsAboveThreshold,
+      email_sent: emailSent,
     })
     .eq("id", scanLogId);
 }

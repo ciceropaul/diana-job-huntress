@@ -10,6 +10,8 @@ export default function SettingsForm({ settings }: { settings: Settings | null }
   const supabase = createClient();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [form, setForm] = useState({
     scan_time: settings?.scan_time ?? "06:00",
@@ -34,6 +36,21 @@ export default function SettingsForm({ settings }: { settings: Settings | null }
     });
     setSaving(false);
     setSaved(true);
+  }
+
+  async function sendTest() {
+    setTesting(true);
+    setTestMsg(null);
+    try {
+      const res = await fetch("/api/digest/test", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to send");
+      setTestMsg({ ok: true, text: `Sent ${data.count} match(es) to ${data.to}.` });
+    } catch (e) {
+      setTestMsg({ ok: false, text: e instanceof Error ? e.message : "Failed to send" });
+    } finally {
+      setTesting(false);
+    }
   }
 
   const input =
@@ -111,7 +128,7 @@ export default function SettingsForm({ settings }: { settings: Settings | null }
         </>
       )}
 
-      <div className="flex items-center gap-3 pt-2">
+      <div className="flex flex-wrap items-center gap-3 pt-2">
         <button
           onClick={save}
           disabled={saving}
@@ -119,8 +136,29 @@ export default function SettingsForm({ settings }: { settings: Settings | null }
         >
           {saving ? "Saving…" : "Save settings"}
         </button>
+        {form.digest_enabled && (
+          <button
+            onClick={sendTest}
+            disabled={testing}
+            className="px-5 py-2.5 bg-[#1a2340] hover:bg-[#243056] text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-60"
+          >
+            {testing ? "Sending…" : "Send test email"}
+          </button>
+        )}
         {saved && <span className="text-sm text-green-400">Saved ✓</span>}
       </div>
+
+      {testMsg && (
+        <div
+          className={`px-4 py-2.5 rounded-lg text-sm ${
+            testMsg.ok
+              ? "bg-green-500/10 border border-green-500/30 text-green-400"
+              : "bg-red-500/10 border border-red-500/30 text-red-400"
+          }`}
+        >
+          {testMsg.text}
+        </div>
+      )}
     </div>
   );
 }

@@ -166,6 +166,7 @@ export type Database = {
       job_scores: {
         Row: {
           dimensions: Json | null
+          fit_summary: string | null
           gaps: string[] | null
           id: string
           job_listing_id: string
@@ -176,6 +177,7 @@ export type Database = {
         }
         Insert: {
           dimensions?: Json | null
+          fit_summary?: string | null
           gaps?: string[] | null
           id?: string
           job_listing_id: string
@@ -186,6 +188,7 @@ export type Database = {
         }
         Update: {
           dimensions?: Json | null
+          fit_summary?: string | null
           gaps?: string[] | null
           id?: string
           job_listing_id?: string

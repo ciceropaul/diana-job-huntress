@@ -8,7 +8,7 @@ export default async function JobsPage() {
 
   const { data: jobs } = await supabase
     .from("job_listings")
-    .select("*, job_scores(overall, matched_skills, gaps)")
+    .select("*, job_scores(overall, fit_summary)")
     .order("date_found", { ascending: false });
 
   return (
@@ -33,10 +33,11 @@ export default async function JobsPage() {
       ) : (
         <div className="space-y-3">
           {jobs.map((job) => {
-            const score =
+            const scoreRow =
               Array.isArray(job.job_scores) && job.job_scores.length > 0
-                ? (job.job_scores[0] as { overall: number }).overall
+                ? (job.job_scores[0] as { overall: number; fit_summary: string | null })
                 : null;
+            const score = scoreRow?.overall ?? null;
             return (
               <Link
                 key={job.id}
@@ -54,6 +55,11 @@ export default async function JobsPage() {
                         <span className="text-slate-600"> · {job.location}</span>
                       )}
                     </p>
+                    {scoreRow?.fit_summary && (
+                      <p className="text-sm text-slate-300 mt-2 leading-relaxed line-clamp-2">
+                        {scoreRow.fit_summary}
+                      </p>
+                    )}
                     {job.date_found && (
                       <p className="text-xs text-slate-600 mt-1.5">
                         Found {new Date(job.date_found).toLocaleDateString()}
