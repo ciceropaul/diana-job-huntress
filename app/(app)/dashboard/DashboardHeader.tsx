@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Search } from "lucide-react";
 
@@ -10,6 +10,7 @@ export default function DashboardHeader({ name }: { name: string }) {
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     const h = new Date().getHours();
@@ -18,6 +19,46 @@ export default function DashboardHeader({ name }: { name: string }) {
     else setGreeting("Good evening");
   }, []);
 
+  // Clean up polling on unmount
+  useEffect(() => {
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current);
+    };
+  }, []);
+
+  function pollStatus(scanLogId: string) {
+    pollRef.current = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/scan?id=${scanLogId}`);
+        if (!res.ok) return;
+        const log = await res.json();
+        if (log?.error) {
+          stopPolling();
+          setError(log.error);
+          setScanning(false);
+          return;
+        }
+        if (log?.completed_at) {
+          stopPolling();
+          setResult(
+            `Scan complete — ${log.jobs_found} found, ${log.jobs_scored} scored, ${log.jobs_above_threshold} strong matches.`
+          );
+          setScanning(false);
+          router.refresh();
+        }
+      } catch {
+        // transient network error — keep polling
+      }
+    }, 4000);
+  }
+
+  function stopPolling() {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }
+
   async function runScan() {
     setScanning(true);
     setError(null);
@@ -25,14 +66,11 @@ export default function DashboardHeader({ name }: { name: string }) {
     try {
       const res = await fetch("/api/scan", { method: "POST" });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Scan failed");
-      setResult(
-        `Scan complete — ${data.jobs_found} found, ${data.jobs_scored} scored, ${data.jobs_above_threshold} strong matches.`
-      );
-      router.refresh();
+      if (!res.ok) throw new Error(data.error || "Scan failed to start");
+      if (!data.scanLogId) throw new Error("No scan id returned");
+      pollStatus(data.scanLogId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Scan failed");
-    } finally {
       setScanning(false);
     }
   }
@@ -62,7 +100,9 @@ export default function DashboardHeader({ name }: { name: string }) {
 
       {scanning && (
         <p className="mt-3 text-xs text-slate-500">
-          Searching your target companies and scoring matches — this can take a minute.
+          Searching your target companies and scoring matches — this runs in the
+          background and can take a couple of minutes. You can leave this page; results
+          will appear on the dashboard.
         </p>
       )}
       {result && (
