@@ -4,6 +4,7 @@ import { ExternalLink } from "lucide-react";
 import CoverLetterSection from "./CoverLetterSection";
 import FlagGreatFit from "./FlagGreatFit";
 import ReanalyzeButton from "./ReanalyzeButton";
+import { detectAts } from "@/lib/ats";
 import { cn } from "@/lib/utils";
 
 export default async function JobDetailPage({
@@ -39,6 +40,8 @@ export default async function JobDetailPage({
   const coverLetter = Array.isArray(job.cover_letters) && job.cover_letters.length > 0
     ? (job.cover_letters[0] as { id: string; content: string; version: number })
     : null;
+
+  const ats = detectAts(job.source_url);
 
   return (
     <div className="p-5 sm:p-8 max-w-4xl mx-auto">
@@ -83,8 +86,9 @@ export default async function JobDetailPage({
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-1.5 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white rounded-lg text-sm font-semibold transition-colors"
+              title={ats.note}
             >
-              View Job <ExternalLink className="w-3.5 h-3.5" />
+              Apply on {ats.label} <ExternalLink className="w-3.5 h-3.5" />
             </a>
           </div>
         </div>
