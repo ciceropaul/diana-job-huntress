@@ -1,0 +1,125 @@
+import { createClient } from "@/lib/supabase/server";
+import { notFound } from "next/navigation";
+import { ExternalLink } from "lucide-react";
+import CoverLetterSection from "./CoverLetterSection";
+import { cn } from "@/lib/utils";
+
+export default async function JobDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const supabase = await createClient();
+
+  const { data: job } = await supabase
+    .from("job_listings")
+    .select("*, job_scores(*), cover_letters(*), applications(*)")
+    .eq("id", id)
+    .single();
+
+  if (!job) notFound();
+
+  const score = Array.isArray(job.job_scores) && job.job_scores.length > 0
+    ? (job.job_scores[0] as { overall: number; reasoning: string; matched_skills: string[]; gaps: string[] })
+    : null;
+
+  const coverLetter = Array.isArray(job.cover_letters) && job.cover_letters.length > 0
+    ? (job.cover_letters[0] as { id: string; content: string; version: number })
+    : null;
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-white">{job.title}</h1>
+            <p className="text-slate-400 mt-1">
+              {job.company}
+              {job.location && <span className="text-slate-600"> · {job.location}</span>}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {score && (
+              <span
+                className={cn(
+                  "text-lg font-bold px-4 py-2 rounded-xl",
+                  score.overall >= 8
+                    ? "bg-green-500/20 text-green-400"
+                    : score.overall >= 6
+                    ? "bg-yellow-500/20 text-yellow-400"
+                    : "bg-red-500/20 text-red-400"
+                )}
+              >
+                {score.overall}/10
+              </span>
+            )}
+            <a
+              href={job.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-4 py-2 bg-[#1B5E20] hover:bg-[#2E7D32] text-white rounded-lg text-sm font-semibold transition-colors"
+            >
+              View Job <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-6">
+        {/* Left: description + score */}
+        <div className="col-span-2 space-y-6">
+          {/* Score breakdown */}
+          {score && (
+            <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-5">
+              <h2 className="text-sm font-semibold text-white mb-3">AI Scoring</h2>
+              {score.reasoning && (
+                <p className="text-sm text-slate-400 mb-4">{score.reasoning}</p>
+              )}
+              {score.matched_skills && score.matched_skills.length > 0 && (
+                <div className="mb-3">
+                  <p className="text-xs font-medium text-green-400 mb-2">Matched skills</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {score.matched_skills.map((s) => (
+                      <span key={s} className="text-xs px-2 py-0.5 bg-green-500/10 text-green-400 rounded-full">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {score.gaps && score.gaps.length > 0 && (
+                <div>
+                  <p className="text-xs font-medium text-red-400 mb-2">Gaps</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {score.gaps.map((g) => (
+                      <span key={g} className="text-xs px-2 py-0.5 bg-red-500/10 text-red-400 rounded-full">
+                        {g}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Description */}
+          {job.description && (
+            <div className="bg-[#0F1629] border border-[#1a2340] rounded-xl p-5">
+              <h2 className="text-sm font-semibold text-white mb-3">Job Description</h2>
+              <p className="text-sm text-slate-400 whitespace-pre-wrap leading-relaxed">
+                {job.description}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* Right: cover letter */}
+        <div className="col-span-1">
+          <CoverLetterSection jobId={job.id} initialCoverLetter={coverLetter} />
+        </div>
+      </div>
+    </div>
+  );
+}
