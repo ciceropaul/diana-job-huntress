@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { getActiveProfile } from "@/lib/profile";
 import CompaniesTable from "./CompaniesTable";
 
 export default async function CompaniesPage() {
@@ -6,10 +7,12 @@ export default async function CompaniesPage() {
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  const profile = await getActiveProfile(supabase);
 
   const { data: companies } = await supabase
     .from("target_companies")
     .select("*")
+    .eq("profile_id", profile?.id ?? "")
     .order("tier", { ascending: true })
     .order("name");
 
@@ -21,7 +24,11 @@ export default async function CompaniesPage() {
           {companies?.length ?? 0} companies. Diana scans their careers pages daily.
         </p>
       </div>
-      <CompaniesTable companies={companies ?? []} userId={user!.id} />
+      <CompaniesTable
+        companies={companies ?? []}
+        userId={user!.id}
+        profileId={profile?.id ?? ""}
+      />
     </div>
   );
 }

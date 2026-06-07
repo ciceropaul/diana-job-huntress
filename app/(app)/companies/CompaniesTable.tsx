@@ -34,9 +34,11 @@ const emptyForm: FormState = {
 export default function CompaniesTable({
   companies: initial,
   userId,
+  profileId,
 }: {
   companies: Company[];
   userId: string;
+  profileId: string;
 }) {
   const supabase = createClient();
   const [companies, setCompanies] = useState(initial);
@@ -76,7 +78,7 @@ export default function CompaniesTable({
     if (editing === "new") {
       const { data, error } = await supabase
         .from("target_companies")
-        .insert({ ...payload, user_id: userId })
+        .insert({ ...payload, user_id: userId, profile_id: profileId })
         .select()
         .single();
       if (!error && data) {

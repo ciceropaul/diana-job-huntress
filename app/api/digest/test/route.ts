@@ -1,8 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { sendDigest } from "@/lib/email/digest";
+import { getActiveProfile } from "@/lib/profile";
 
-// POST /api/digest/test — send a digest of the current top matches to verify email setup
+// POST /api/digest/test — send a digest of the active profile's top matches
 export async function POST() {
   const supabase = await createClient();
   const {
@@ -10,14 +11,14 @@ export async function POST() {
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
-  const [{ data: profile }, { data: settings }] = await Promise.all([
-    supabase.from("profiles").select("name").eq("user_id", user.id).single(),
-    supabase
-      .from("settings")
-      .select("digest_enabled, digest_recipient, digest_min_score")
-      .eq("user_id", user.id)
-      .single(),
-  ]);
+  const profile = await getActiveProfile(supabase);
+  if (!profile) return NextResponse.json({ error: "no active profile" }, { status: 404 });
+
+  const { data: settings } = await supabase
+    .from("settings")
+    .select("digest_enabled, digest_recipient, digest_min_score")
+    .eq("profile_id", profile.id)
+    .maybeSingle();
 
   if (!settings?.digest_enabled) {
     return NextResponse.json(
@@ -34,10 +35,11 @@ export async function POST() {
 
   const minScore = settings.digest_min_score ?? 7;
 
-  // Pull current top matches for this user
+  // Pull current top matches for the active profile
   const { data: jobs } = await supabase
     .from("job_listings")
     .select("id, title, company, location, source_url, job_scores(overall, fit_summary)")
+    .eq("profile_id", profile.id)
     .order("date_found", { ascending: false });
 
   const matches = (jobs ?? [])
@@ -69,8 +71,8 @@ export async function POST() {
   }
 
   const sent = await sendDigest({
-    userId: user.id,
-    candidateName: (profile?.name ?? "there").split(" ")[0],
+    profileId: profile.id,
+    candidateName: (profile.name ?? "there").split(" ")[0],
     matches,
   });
 

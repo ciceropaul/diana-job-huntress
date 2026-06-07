@@ -12,17 +12,20 @@ export async function POST(req: NextRequest) {
   const { jobId } = await req.json();
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 });
 
-  const [{ data: profile }, { data: job }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("user_id", user.id).single(),
-    supabase
-      .from("job_listings")
-      .select("*, job_scores(*)")
-      .eq("id", jobId)
-      .single(),
-  ]);
+  const { data: job } = await supabase
+    .from("job_listings")
+    .select("*, job_scores(*)")
+    .eq("id", jobId)
+    .single();
+  if (!job) return NextResponse.json({ error: "job not found" }, { status: 404 });
 
-  if (!profile || !job) {
-    return NextResponse.json({ error: "job or profile not found" }, { status: 404 });
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("*")
+    .eq("id", job.profile_id)
+    .single();
+  if (!profile) {
+    return NextResponse.json({ error: "profile not found" }, { status: 404 });
   }
 
   const score = Array.isArray(job.job_scores) && job.job_scores.length > 0

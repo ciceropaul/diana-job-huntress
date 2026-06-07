@@ -88,7 +88,7 @@ function renderHtml(candidateName: string, matches: DigestMatch[]) {
  * than throwing) when disabled, misconfigured, or there's nothing to send.
  */
 export async function sendDigest(opts: {
-  userId: string;
+  profileId: string;
   candidateName: string;
   matches: DigestMatch[];
 }): Promise<boolean> {
@@ -105,8 +105,8 @@ export async function sendDigest(opts: {
   const { data: settings } = await supabase
     .from("settings")
     .select("digest_enabled, digest_recipient")
-    .eq("user_id", opts.userId)
-    .single();
+    .eq("profile_id", opts.profileId)
+    .maybeSingle();
 
   if (!settings?.digest_enabled) return false;
   if (!settings.digest_recipient) return false;

@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Briefcase, Building2, TrendingUp, Clock } from "lucide-react";
 import DashboardHeader from "./DashboardHeader";
+import { getActiveProfile } from "@/lib/profile";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -10,25 +11,34 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const profile = await getActiveProfile(supabase);
+  const profileId = profile?.id ?? "";
+
   const [
     { count: jobCount },
     { count: companyCount },
     { data: recentJobs },
     { data: recentScans },
   ] = await Promise.all([
-    supabase.from("job_listings").select("*", { count: "exact", head: true }),
+    supabase
+      .from("job_listings")
+      .select("*", { count: "exact", head: true })
+      .eq("profile_id", profileId),
     supabase
       .from("target_companies")
       .select("*", { count: "exact", head: true })
+      .eq("profile_id", profileId)
       .eq("suppressed", false),
     supabase
       .from("job_listings")
       .select("*, job_scores(overall)")
+      .eq("profile_id", profileId)
       .order("date_found", { ascending: false })
       .limit(5),
     supabase
       .from("scan_logs")
       .select("*")
+      .eq("profile_id", profileId)
       .order("started_at", { ascending: false })
       .limit(3),
   ]);
@@ -65,7 +75,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="p-5 sm:p-8 max-w-5xl mx-auto">
-      <DashboardHeader name={firstName} />
+      <DashboardHeader name={firstName} profileName={profile?.name?.trim() || undefined} />
 
       {/* Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">

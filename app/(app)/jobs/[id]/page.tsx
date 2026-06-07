@@ -30,6 +30,7 @@ export default async function JobDetailPage({
   const { data: exemplarMatch } = await supabase
     .from("exemplars")
     .select("id")
+    .eq("profile_id", job.profile_id)
     .eq("source_url", job.source_url)
     .maybeSingle();
 
@@ -72,6 +73,7 @@ export default async function JobDetailPage({
             )}
             <FlagGreatFit
               userId={user!.id}
+              profileId={job.profile_id}
               job={{
                 title: job.title,
                 company: job.company,

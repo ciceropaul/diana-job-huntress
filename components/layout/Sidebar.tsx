@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import type { User } from "@supabase/supabase-js";
+import ProfileSwitcher from "./ProfileSwitcher";
 import {
   LayoutDashboard,
   User as UserIcon,
@@ -28,11 +29,17 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+type ProfileLite = { id: string; name: string | null };
+
 function NavContent({
   user,
+  profiles,
+  activeProfileId,
   onNavigate,
 }: {
   user: User;
+  profiles: ProfileLite[];
+  activeProfileId: string | null;
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
@@ -56,6 +63,9 @@ function NavContent({
           <span className="text-white font-bold text-lg tracking-tight">Diana</span>
         </div>
       </div>
+
+      {/* Profile switcher */}
+      <ProfileSwitcher profiles={profiles} activeId={activeProfileId} />
 
       {/* Nav */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
@@ -100,7 +110,15 @@ function NavContent({
   );
 }
 
-export default function Sidebar({ user }: { user: User }) {
+export default function Sidebar({
+  user,
+  profiles,
+  activeProfileId,
+}: {
+  user: User;
+  profiles: ProfileLite[];
+  activeProfileId: string | null;
+}) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
@@ -113,7 +131,7 @@ export default function Sidebar({ user }: { user: User }) {
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-60 flex-shrink-0 bg-[#0F1629] border-r border-[#1a2340] flex-col">
-        <NavContent user={user} />
+        <NavContent user={user} profiles={profiles} activeProfileId={activeProfileId} />
       </aside>
 
       {/* Mobile top bar */}
@@ -148,7 +166,12 @@ export default function Sidebar({ user }: { user: User }) {
             >
               <X className="w-5 h-5" />
             </button>
-            <NavContent user={user} onNavigate={() => setOpen(false)} />
+            <NavContent
+              user={user}
+              profiles={profiles}
+              activeProfileId={activeProfileId}
+              onNavigate={() => setOpen(false)}
+            />
           </aside>
         </div>
       )}

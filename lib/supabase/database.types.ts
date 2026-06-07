@@ -16,6 +16,7 @@ export type Database = {
           id: string
           job_listing_id: string
           notes: string | null
+          profile_id: string
           status: string | null
           status_updated_at: string | null
           user_id: string
@@ -26,6 +27,7 @@ export type Database = {
           id?: string
           job_listing_id: string
           notes?: string | null
+          profile_id: string
           status?: string | null
           status_updated_at?: string | null
           user_id: string
@@ -36,6 +38,7 @@ export type Database = {
           id?: string
           job_listing_id?: string
           notes?: string | null
+          profile_id?: string
           status?: string | null
           status_updated_at?: string | null
           user_id?: string
@@ -46,6 +49,13 @@ export type Database = {
             columns: ["job_listing_id"]
             isOneToOne: false
             referencedRelation: "job_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -92,6 +102,7 @@ export type Database = {
           description: string | null
           id: string
           location: string | null
+          profile_id: string
           source_url: string | null
           title: string
           user_id: string
@@ -103,6 +114,7 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
+          profile_id: string
           source_url?: string | null
           title: string
           user_id: string
@@ -114,12 +126,21 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
+          profile_id?: string
           source_url?: string | null
           title?: string
           user_id?: string
           why_great?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "exemplars_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       job_listings: {
         Row: {
@@ -129,6 +150,7 @@ export type Database = {
           description: string | null
           id: string
           location: string | null
+          profile_id: string
           raw_html: string | null
           source: string | null
           source_url: string
@@ -142,6 +164,7 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
+          profile_id: string
           raw_html?: string | null
           source?: string | null
           source_url: string
@@ -155,13 +178,22 @@ export type Database = {
           description?: string | null
           id?: string
           location?: string | null
+          profile_id?: string
           raw_html?: string | null
           source?: string | null
           source_url?: string
           title?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "job_listings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       job_scores: {
         Row: {
@@ -261,6 +293,7 @@ export type Database = {
           jobs_above_threshold: number | null
           jobs_found: number | null
           jobs_scored: number | null
+          profile_id: string
           started_at: string | null
           triggered_by: string | null
           user_id: string
@@ -273,6 +306,7 @@ export type Database = {
           jobs_above_threshold?: number | null
           jobs_found?: number | null
           jobs_scored?: number | null
+          profile_id: string
           started_at?: string | null
           triggered_by?: string | null
           user_id: string
@@ -285,11 +319,20 @@ export type Database = {
           jobs_above_threshold?: number | null
           jobs_found?: number | null
           jobs_scored?: number | null
+          profile_id?: string
           started_at?: string | null
           triggered_by?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scan_logs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       settings: {
         Row: {
@@ -297,6 +340,7 @@ export type Database = {
           digest_min_score: number | null
           digest_recipient: string | null
           id: string
+          profile_id: string
           scan_sources: Json | null
           scan_time: string | null
           updated_at: string | null
@@ -307,6 +351,7 @@ export type Database = {
           digest_min_score?: number | null
           digest_recipient?: string | null
           id?: string
+          profile_id: string
           scan_sources?: Json | null
           scan_time?: string | null
           updated_at?: string | null
@@ -317,12 +362,21 @@ export type Database = {
           digest_min_score?: number | null
           digest_recipient?: string | null
           id?: string
+          profile_id?: string
           scan_sources?: Json | null
           scan_time?: string | null
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "settings_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       target_companies: {
         Row: {
@@ -332,6 +386,7 @@ export type Database = {
           id: string
           name: string
           notes: string | null
+          profile_id: string
           sector: string | null
           suppressed: boolean | null
           tags: string[] | null
@@ -345,6 +400,7 @@ export type Database = {
           id?: string
           name: string
           notes?: string | null
+          profile_id: string
           sector?: string | null
           suppressed?: boolean | null
           tags?: string[] | null
@@ -358,13 +414,22 @@ export type Database = {
           id?: string
           name?: string
           notes?: string | null
+          profile_id?: string
           sector?: string | null
           suppressed?: boolean | null
           tags?: string[] | null
           tier?: number | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "target_companies_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
@@ -461,40 +526,6 @@ export type TablesUpdate<
       }
       ? U
       : never
-    : never
-
-export type Enums<
-  DefaultSchemaEnumNameOrOptions extends
-    | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
-> = DefaultSchemaEnumNameOrOptions extends {
-  schema: keyof Database
-}
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
-  : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
-    ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
-    : never
-
-export type CompositeTypes<
-  PublicCompositeTypeNameOrOptions extends
-    | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
-  }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
-> = PublicCompositeTypeNameOrOptions extends {
-  schema: keyof Database
-}
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
-  : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
-    ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
 
 export const Constants = {

@@ -7,7 +7,7 @@ export const maxDuration = 60;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
-// POST /api/score { jobId } — (re)score a single job for the current user's profile
+// POST /api/score { jobId } — (re)score a single job for its profile
 export async function POST(req: NextRequest) {
   const supabase = await createClient();
   const {
@@ -18,14 +18,20 @@ export async function POST(req: NextRequest) {
   const { jobId } = await req.json();
   if (!jobId) return NextResponse.json({ error: "jobId required" }, { status: 400 });
 
-  const [{ data: profile }, { data: exemplars }, { data: job }] = await Promise.all([
-    supabase.from("profiles").select("*").eq("user_id", user.id).single(),
-    supabase.from("exemplars").select("*").eq("user_id", user.id),
-    supabase.from("job_listings").select("*").eq("id", jobId).single(),
+  const { data: job } = await supabase
+    .from("job_listings")
+    .select("*")
+    .eq("id", jobId)
+    .single();
+  if (!job) return NextResponse.json({ error: "job not found" }, { status: 404 });
+
+  const [{ data: profile }, { data: exemplars }] = await Promise.all([
+    supabase.from("profiles").select("*").eq("id", job.profile_id).single(),
+    supabase.from("exemplars").select("*").eq("profile_id", job.profile_id),
   ]);
 
-  if (!profile || !job) {
-    return NextResponse.json({ error: "job or profile not found" }, { status: 404 });
+  if (!profile) {
+    return NextResponse.json({ error: "profile not found" }, { status: 404 });
   }
 
   const ctx = buildCandidateContext(profile, exemplars);

@@ -2,13 +2,16 @@ import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { Briefcase } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getActiveProfile } from "@/lib/profile";
 
 export default async function JobsPage() {
   const supabase = await createClient();
+  const profile = await getActiveProfile(supabase);
 
   const { data: jobs } = await supabase
     .from("job_listings")
     .select("*, job_scores(overall, fit_summary)")
+    .eq("profile_id", profile?.id ?? "")
     .order("date_found", { ascending: false });
 
   return (

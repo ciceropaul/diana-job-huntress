@@ -5,6 +5,7 @@ import { NextRequest, NextResponse, after } from "next/server";
 import type { Database } from "@/lib/supabase/database.types";
 import { buildCandidateContext, scoreJob, textOf } from "@/lib/scoring";
 import { sendDigest } from "@/lib/email/digest";
+import { getActiveProfile } from "@/lib/profile";
 
 export const maxDuration = 300;
 
@@ -48,32 +49,56 @@ export async function GET(req: NextRequest) {
 
 // POST /api/scan — start a scan; returns immediately with the scan log id.
 // Heavy work runs in the background via after().
+// - manual (logged-in): scans the active profile
+// - cron (Bearer CRON_SECRET): scans every profile across all users
 export async function POST(req: NextRequest) {
   const isCron = isCronRequest(req);
   const serviceSupabase = serviceClient();
-  let userId: string;
 
   if (isCron) {
-    const { data: settings } = await serviceSupabase
-      .from("settings")
-      .select("user_id")
-      .limit(1)
-      .single();
-    if (!settings) return NextResponse.json({ error: "no users" }, { status: 404 });
-    userId = settings.user_id;
-  } else {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
-    userId = user.id;
+    const { data: profiles } = await serviceSupabase
+      .from("profiles")
+      .select("id, user_id");
+    if (!profiles?.length) {
+      return NextResponse.json({ error: "no profiles" }, { status: 404 });
+    }
+
+    after(async () => {
+      for (const p of profiles) {
+        const { data: scanLog } = await serviceSupabase
+          .from("scan_logs")
+          .insert({ user_id: p.user_id, profile_id: p.id, triggered_by: "cron" })
+          .select()
+          .single();
+        if (!scanLog) continue;
+        try {
+          await runScan(serviceSupabase, p.id, p.user_id, scanLog.id);
+        } catch (error) {
+          const msg = error instanceof Error ? error.message : "Unknown error";
+          await serviceSupabase
+            .from("scan_logs")
+            .update({ completed_at: new Date().toISOString(), error: msg })
+            .eq("id", scanLog.id);
+        }
+      }
+    });
+
+    return NextResponse.json({ status: "started", profiles: profiles.length }, { status: 202 });
   }
 
-  // Create the scan log up front so the client can poll it
+  // Manual: authenticate + resolve active profile
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const profile = await getActiveProfile(supabase);
+  if (!profile) return NextResponse.json({ error: "no active profile" }, { status: 404 });
+
   const { data: scanLog } = await serviceSupabase
     .from("scan_logs")
-    .insert({ user_id: userId, triggered_by: isCron ? "cron" : "manual" })
+    .insert({ user_id: user.id, profile_id: profile.id, triggered_by: "manual" })
     .select()
     .single();
 
@@ -82,10 +107,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "could not create scan log" }, { status: 500 });
   }
 
-  // Run the scan after the response is sent (kept alive up to maxDuration)
+  const profileId = profile.id;
+  const userId = user.id;
   after(async () => {
     try {
-      await runScan(serviceSupabase, userId, scanLogId);
+      await runScan(serviceSupabase, profileId, userId, scanLogId);
     } catch (error) {
       const msg = error instanceof Error ? error.message : "Unknown error";
       await serviceSupabase
@@ -95,25 +121,25 @@ export async function POST(req: NextRequest) {
     }
   });
 
-  // Respond immediately
   return NextResponse.json({ scanLogId, status: "started" }, { status: 202 });
 }
 
 async function runScan(
   serviceSupabase: ServiceClient,
+  profileId: string,
   userId: string,
   scanLogId: string
 ) {
-  // Load profile + companies + exemplars
+  // Load profile + companies + exemplars (scoped to this profile)
   const [{ data: profile }, { data: companies }, { data: exemplars }] =
     await Promise.all([
-      serviceSupabase.from("profiles").select("*").eq("user_id", userId).single(),
+      serviceSupabase.from("profiles").select("*").eq("id", profileId).single(),
       serviceSupabase
         .from("target_companies")
         .select("*")
-        .eq("user_id", userId)
+        .eq("profile_id", profileId)
         .eq("suppressed", false),
-      serviceSupabase.from("exemplars").select("*").eq("user_id", userId),
+      serviceSupabase.from("exemplars").select("*").eq("profile_id", profileId),
     ]);
 
   if (!profile || !companies?.length) {
@@ -171,7 +197,7 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
   const { data: existingListings } = await serviceSupabase
     .from("job_listings")
     .select("source_url")
-    .eq("user_id", userId);
+    .eq("profile_id", profileId);
 
   const existingUrls = new Set(existingListings?.map((l) => l.source_url) ?? []);
   // Dedup against the DB and within the batch itself (the model sometimes repeats)
@@ -202,6 +228,7 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
     .insert(
       newJobs.map((j) => ({
         user_id: userId,
+        profile_id: profileId,
         title: j.title,
         company: j.company,
         location: j.location ?? null,
@@ -213,13 +240,13 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
     )
     .select();
 
-  const { data: userSettings } = await serviceSupabase
+  const { data: profileSettings } = await serviceSupabase
     .from("settings")
     .select("digest_min_score")
-    .eq("user_id", userId)
-    .single();
+    .eq("profile_id", profileId)
+    .maybeSingle();
 
-  const minScore = userSettings?.digest_min_score ?? 7;
+  const minScore = profileSettings?.digest_min_score ?? 7;
 
   // Score jobs in parallel using the shared scoring helper
   const scoreResults = await Promise.all(
@@ -254,7 +281,7 @@ Return ONLY the JSON array, no other text. Include only real, currently open lis
   let emailSent = false;
   try {
     emailSent = await sendDigest({
-      userId,
+      profileId,
       candidateName: ctx.firstName,
       matches: strongMatches.map((s) => ({
         id: s.job.id,

@@ -4,7 +4,13 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, Search } from "lucide-react";
 
-export default function DashboardHeader({ name }: { name: string }) {
+export default function DashboardHeader({
+  name,
+  profileName,
+}: {
+  name: string;
+  profileName?: string;
+}) {
   const router = useRouter();
   const [greeting, setGreeting] = useState("Hello");
   const [scanning, setScanning] = useState(false);
@@ -82,7 +88,11 @@ export default function DashboardHeader({ name }: { name: string }) {
           <h1 className="text-2xl font-bold text-white">
             {greeting}, {name} 👋
           </h1>
-          <p className="text-slate-400 mt-1">Here&apos;s your job search snapshot.</p>
+          <p className="text-slate-400 mt-1">
+            {profileName
+              ? `Job search snapshot for ${profileName}.`
+              : "Here's your job search snapshot."}
+          </p>
         </div>
         <button
           onClick={runScan}

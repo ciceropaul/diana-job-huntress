@@ -27,13 +27,18 @@ export default function SettingsForm({ settings }: { settings: Settings | null }
 
   async function save() {
     setSaving(true);
-    await supabase.from("settings").update({
-      scan_time: form.scan_time,
-      digest_enabled: form.digest_enabled,
-      digest_recipient: form.digest_recipient,
-      digest_min_score: form.digest_min_score,
-      updated_at: new Date().toISOString(),
-    });
+    if (settings?.id) {
+      await supabase
+        .from("settings")
+        .update({
+          scan_time: form.scan_time,
+          digest_enabled: form.digest_enabled,
+          digest_recipient: form.digest_recipient,
+          digest_min_score: form.digest_min_score,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", settings.id);
+    }
     setSaving(false);
     setSaved(true);
   }

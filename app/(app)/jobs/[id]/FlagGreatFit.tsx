@@ -6,10 +6,12 @@ import { Star } from "lucide-react";
 
 export default function FlagGreatFit({
   userId,
+  profileId,
   job,
   alreadyFlagged,
 }: {
   userId: string;
+  profileId: string;
   job: {
     title: string;
     company: string;
@@ -27,6 +29,7 @@ export default function FlagGreatFit({
     setSaving(true);
     const { error } = await supabase.from("exemplars").insert({
       user_id: userId,
+      profile_id: profileId,
       title: job.title,
       company: job.company,
       location: job.location,

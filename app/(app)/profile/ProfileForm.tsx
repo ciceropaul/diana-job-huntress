@@ -49,7 +49,7 @@ export default function ProfileForm({ profile }: { profile: Profile | null }) {
         green_flags: greenFlags,
         updated_at: new Date().toISOString(),
       })
-      .eq("user_id", profile!.user_id);
+      .eq("id", profile!.id);
 
     setSaving(false);
     setSaved(true);
