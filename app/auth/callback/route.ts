@@ -8,6 +8,14 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const next = searchParams.get("next") ?? "/dashboard";
 
+  // If the provider redirected back with an error, surface it
+  const providerError = searchParams.get("error_description") || searchParams.get("error");
+  if (providerError) {
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(providerError)}`
+    );
+  }
+
   if (!code) {
     return NextResponse.redirect(`${origin}/login?error=no_code`);
   }
@@ -34,7 +42,9 @@ export async function GET(request: NextRequest) {
 
   if (error) {
     console.error("OAuth callback error:", error.message);
-    return NextResponse.redirect(`${origin}/login?error=auth_failed`);
+    return NextResponse.redirect(
+      `${origin}/login?error=${encodeURIComponent(error.message)}`
+    );
   }
 
   // Successful sign-in — the DB trigger auto-seeds profile + companies

@@ -2,9 +2,13 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
-export default function LoginPage() {
+function LoginContent() {
   const [loading, setLoading] = useState(false);
+  const searchParams = useSearchParams();
+  const error = searchParams.get("error");
 
   async function handleGoogleSignIn() {
     setLoading(true);
@@ -43,6 +47,13 @@ export default function LoginPage() {
             Your AI-powered job search agent
           </p>
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="mb-4 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 text-xs break-words">
+            {error}
+          </div>
+        )}
 
         {/* Sign in button */}
         <button
@@ -83,5 +94,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-[#0A0F1E]" />}>
+      <LoginContent />
+    </Suspense>
   );
 }
